@@ -1,0 +1,13 @@
+id,exp_name,updated_at,has_planner,llm_model,llm_provider,tickers
+a4b372ae-f3b0-48be-a7e5-2d3a6645e062,deepseek-test,2025-03-01 12:21:42.797978+00,false,deepseek-chat,DeepSeek,"[""MSFT"",""NVDA"",""AAPL"",""AMZN"",""GOOGL""]"
+b5c483fa-8e12-49a3-93f6-3d4ba6756071,development,2025-03-01 14:30:15.234567+00,true,claude-3-opus,Anthropic,"[""TSLA"",""META"",""NFLX"",""DIS"",""PYPL""]"
+c6d594fb-9f23-50b4-a4g7-4e5cb7867182,ollama-test,2025-03-01 16:45:22.345678+00,false,llama-3-70b,Ollama,"[""AMD"",""INTC"",""CSCO"",""IBM"",""ORCL""]"
+d7e605gc-0g34-61c5-b5h8-5f6dc8978293,gemini-trader,2025-03-01 18:12:33.456789+00,true,gemini-1.5-pro,Google,"[""JPM"",""BAC"",""GS"",""MS"",""WFC""]"
+e8f716hd-1h45-72d6-c6i9-6g7ed9089304,mistral-invest,2025-03-01 20:25:44.567890+00,false,mistral-large,Mistral,"[""PFE"",""JNJ"",""MRK"",""ABBV"",""LLY""]"
+f9g827ie-2i56-83e7-d7j0-7h8fe0190415,gpt4-portfolio,2025-03-01 22:40:55.678901+00,true,gpt-4o,OpenAI,"[""KO"",""PEP"",""MCD"",""SBUX"",""YUM""]"
+g0h938jf-3j67-94f8-e8k1-8i9gf1201526,glm-markets,2025-03-02 00:55:06.789012+00,false,chatglm-4,Zhipu,"[""WMT"",""TGT"",""COST"",""HD"",""LOW""]"
+h1i049kg-4k78-05g9-f9l2-9j0hg2312637,qwen-fintech,2025-03-02 03:10:17.890123+00,true,qwen-max,Alibaba,"[""V"",""MA"",""AXP"",""PYPL"",""SQ""]"
+i2j150lh-5l89-16h0-g0m3-0k1ih3423748,yi-trading,2025-03-02 05:25:28.901234+00,false,yi-34b,01.AI,"[""UNH"",""CVS"",""CI"",""HUM"",""ANTM""]"
+j3k261mi-6m90-27i1-h1n4-1l2ji4534859,phi-investments,2025-03-02 07:40:39.012345+00,true,phi-3,Microsoft,"[""NVDA"",""AAPL"",""MSFT"",""GOOGL"",""AMZN""]"
+k4l372nj-7n01-38j2-i2o5-2m3kj5645960,command-capital,2025-03-02 09:55:50.123456+00,false,command-r,Cohere,"[""PG"",""CL"",""UL"",""KMB"",""CHD""]"
+l5m483ok-8o12-49k3-j3p6-3n4lk6757071,baichuan-wealth,2025-03-02 12:10:01.234567+00,true,baichuan-turbo,Baichuan,"[""XOM"",""CVX"",""BP"",""SHEL"",""COP""]"
