@@ -225,10 +225,10 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
             'Analyst Portfolio': 'N/A', # Placeholder
             'Total Return (%)': total_return_pct,
             'Current Total Value ($)': latest_total_value,
-            'Current Holdings (%)': holdings_formatted,
-            'Composite Score': 'N/A', # Placeholder
-            'License': 'N/A', # Placeholder
-            'API Cost ($)': 'N/A' # Placeholder
+            # 'Current Holdings (%)': holdings_formatted, # Removed
+            # 'Composite Score': 'N/A', # Removed
+            # 'License': 'N/A', # Removed
+            # 'API Cost ($)': 'N/A' # Removed
         })
 
     if not all_stats:
@@ -239,15 +239,18 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
     # Calculate Rank based on Total Return (%)
     stats_df = stats_df.sort_values(by='Total Return (%)', ascending=False, na_position='last')
     stats_df.insert(0, 'Rank', range(1, len(stats_df) + 1))
+    # Add Placeholder Rank Change column
+    stats_df['Rank Change'] = 'N/A' # Placeholder - requires historical data
 
-    # Format numeric columns
-    stats_df['Daily Return (%)'] = stats_df['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-    stats_df['Total Return (%)'] = stats_df['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-    stats_df['Current Total Value ($)'] = stats_df['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
+    # --- Defer formatting to display function ---
+    # stats_df['Daily Return (%)'] = stats_df['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+    # stats_df['Total Return (%)'] = stats_df['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+    # stats_df['Current Total Value ($)'] = stats_df['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
 
     # Select and reorder columns for final display
     final_columns = [
         'Rank',
+        'Rank Change', # Added placeholder
         'LLM Model',
         'Start Date',
         'Decision Accuracy (%)',
@@ -255,10 +258,10 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
         'Analyst Portfolio',
         'Total Return (%)',
         'Current Total Value ($)',
-        'Current Holdings (%)',
-        'Composite Score',
-        'License',
-        'API Cost ($)'
+        # 'Current Holdings (%)', # Removed
+        # 'Composite Score', # Removed
+        # 'License', # Removed
+        # 'API Cost ($)' # Removed
     ]
     # Ensure only existing columns are selected
     final_columns = [col for col in final_columns if col in stats_df.columns] 
@@ -475,10 +478,25 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
     table_data = calculate_experiment_stats(config_df, portfolio_df_orig)
 
     if not table_data.empty:
+        # Apply formatting before styling
+        table_data_formatted = table_data.copy()
+        table_data_formatted['Daily Return (%)'] = table_data_formatted['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+        table_data_formatted['Total Return (%)'] = table_data_formatted['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+        table_data_formatted['Current Total Value ($)'] = table_data_formatted['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
+
+        # Apply Styling
+        styled_table = table_data_formatted.style.set_properties(
+            subset=['Rank', 'Rank Change'], 
+            **{'text-align': 'left'}
+        ).set_properties(
+            subset=['Daily Return (%)', 'Total Return (%)', 'Current Total Value ($)'], 
+            **{'text-align': 'right'}
+        )
+
         # Calculate dynamic height: (num_rows + header) * pixels_per_row + buffer
         dynamic_height = (len(table_data) + 1) * 35 + 3 
         st.dataframe(
-            table_data, 
+            styled_table, # Use the styled table
             use_container_width=True, 
             hide_index=True, 
             height=dynamic_height # Set the calculated height
