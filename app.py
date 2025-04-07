@@ -4,6 +4,10 @@ from streamlit_echarts import st_echarts
 from streamlit_option_menu import option_menu
 import json # Needed for parsing holdings
 import numpy as np
+import agent_lab
+import about_us # <-- Import added here
+import markets # <-- Import added here
+import reports # <-- Import added here
 
 st.set_page_config(layout="wide")
 
@@ -18,16 +22,16 @@ header[data-testid="stHeader"] {
 /* Main content padding to prevent overlap with fixed banners */
 /* Try targeting the main block container directly */
 .main .block-container {
-    padding-top: 60px !important;  /* Adjust if top banner height changes */
+    padding-top: 0px !important;  /* Reduced top padding */
     padding-bottom: 50px !important; /* Adjust if bottom banner height changes */
 }
 /* Fallback/Alternative targets */
 div[data-testid="stAppViewContainer"] > section > div[data-testid="stVerticalBlock"] {
-    padding-top: 60px !important;
+    padding-top: 0px !important; /* Reduced top padding */
     padding-bottom: 50px !important;
 }
 div.block-container {
-    padding-top: 60px !important;
+    padding-top: 0px !important; /* Reduced top padding */
     padding-bottom: 50px !important;
 }
 
@@ -468,26 +472,27 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
 
         if not data_to_plot.empty:
             legend_data.append(exp_name)
-            # Convert index to string for ECharts AND round the value
+            # 直接使用日期作为x轴，值作为y轴
             data_pairs = [[idx.strftime('%Y-%m-%d %H:%M:%S'), round(val, 2)] for idx, val in data_to_plot.items()]
             series_name = exp_name
             echarts_series.append({
                 "name": series_name,
                 "data": data_pairs,
-                "type": "line", "smooth": True, "symbol": "none",
+                "type": "line", 
+                "smooth": True, 
+                "symbol": "none",
             })
 
     # --- Chart Display --- 
     if echarts_series:
         option = {
-            "title": {"text": chart_title, "left": "center"},
+            "title": {"text": chart_title, "left": "left"},
             "tooltip": {
                 "trigger": 'axis',
                 "axisPointer": {"type": 'cross'},
-                "valueFormatter": tooltip_value_formatter # Use the % formatter
             },
-            "legend": {"data": legend_data, "top": 'bottom', "type": 'scroll'},
-            "grid": {"left": '3%', "right": '4%', "bottom": '15%', "containLabel": True},
+            "legend": {"data": legend_data, "bottom": 65, "type": 'scroll'},
+            "grid": {"left": '3%', "right": '4%', "bottom": '20%', "containLabel": True},
             "xAxis": {
                 "type": "time",
                 "axisLabel": {"formatter": '{yyyy}-{MM}-{dd}\n{HH}:{mm}:{ss}', "rotate": 0}
@@ -500,8 +505,8 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
             },
             "series": echarts_series,
             "dataZoom": [
-                {"type": "slider", "xAxisIndex": 0, "start": 0, "end": 100, "bottom": 30},
-                {"type": "inside", "xAxisIndex": 0, "start": 0, "end": 100}
+                {"type": "slider", "xAxisIndex": 0, "start": 0, "end": 100, "bottom": 30, "zoomLock": False},
+                {"type": "inside", "xAxisIndex": 0, "start": 0, "end": 100, "zoomOnMouseWheel": False, "moveOnMouseWheel": True}
             ],
         }
         st_echarts(options=option, height="500px")
@@ -512,11 +517,213 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
             st.warning(f"No suitable data found to display Cumulative Return for experiment: {selected_exp_name}. Ensure sufficient data points exist.")
 
     # --- Summary Table / Single Experiment Dashboard Section ---
-    st.divider()
+    # st.divider()
 
     if selected_exp_name == "All":
-        # --- Display Summary Table for All Experiments ---
-        st.subheader("Experiment Summary & Ranking")
+        # --- 添加整体市场仪表板 --- (Moved below chart)
+        table_data = calculate_experiment_stats(config_df, portfolio_df_orig)
+
+        # --- 添加所有模型与市场指数对比图表 --- (Moved to top of 'All' section)
+        # st.subheader("LLMs vs Market Indices Performance")
+
+        # 获取时间范围（使用所有模型数据的最早开始日期和最晚结束日期）
+        all_timestamps = portfolio_df_orig['timestamp'].dropna()
+        if not all_timestamps.empty:
+            min_date = all_timestamps.min()
+            max_date = all_timestamps.max()
+            date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+
+            # 创建模拟的市场指数数据
+            market_data = pd.DataFrame(index=date_range)
+
+            # 模拟三大指数的初始值和变化
+            np.random.seed(42)  # 确保结果一致性
+
+            # 基本模式 + 随机波动
+            nasdaq_changes = np.concatenate([np.linspace(0, 0.15, len(date_range)//2),
+                                          np.linspace(0.15, 0.25, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.02, len(date_range))
+            sp500_changes = np.concatenate([np.linspace(0, 0.10, len(date_range)//2),
+                                         np.linspace(0.10, 0.18, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.015, len(date_range))
+            dow_changes = np.concatenate([np.linspace(0, 0.08, len(date_range)//2),
+                                       np.linspace(0.08, 0.15, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.01, len(date_range))
+
+            # 转换为累计收益率
+            market_data['NASDAQ'] = (1 + nasdaq_changes) * 100 - 100
+            market_data['S&P 500'] = (1 + sp500_changes) * 100 - 100
+            market_data['DOW JONES'] = (1 + dow_changes) * 100 - 100
+
+            # 计算所有模型的平均收益率
+            # 根据配置ID分组
+            grouped = portfolio_df_orig.groupby('config_id')
+
+            # 创建一个空的DataFrame，用于存储每个模型在每个日期的累计收益率
+            all_returns = pd.DataFrame(index=date_range)
+
+            # 计算每个模型的累计收益率
+            for config_id, group in grouped:
+                group_sorted = group.sort_values('timestamp')
+
+                # --- 处理重复时间戳：保留最后一条记录 ---
+                group_sorted = group_sorted.drop_duplicates(subset='timestamp', keep='last')
+                # -------------------------------------
+
+                timestamps = group_sorted['timestamp']
+                values = group_sorted['total_value']
+
+                if len(values) >= 2:
+                    returns = calculate_cumulative_return(values)
+                    # 将收益率与时间戳对齐
+                    returns_series = pd.Series(returns.values, index=timestamps)
+
+                    # --- 确保 reindex 前索引唯一 (安全检查) ---
+                    if not returns_series.index.is_unique:
+                        st.warning(f"Duplicate timestamps detected for model {config_id} even after filtering. Keeping last entry.")
+                        returns_series = returns_series.loc[~returns_series.index.duplicated(keep='last')] # 保留最后一个重复项
+                    # ---------------------------------------
+
+                    # 只有在索引唯一时才执行 reindex
+                    if returns_series.index.is_unique:
+                        # 重采样到完整日期范围
+                        returns_resampled = returns_series.reindex(date_range, method='ffill')
+                        # 将当前模型的收益率添加到all_returns
+                        all_returns[f'Model_{config_id}'] = returns_resampled
+                    else:
+                        st.warning(f"Skipping model {config_id} for average calculation due to persistent duplicate timestamps.")
+
+            # 计算所有模型的平均收益率
+            if not all_returns.empty and len(all_returns.columns) > 0:
+                all_returns['Average_LLMs'] = all_returns.mean(axis=1)
+
+                # 合并LLM平均收益率和市场指数数据
+                combined_data = pd.DataFrame(index=date_range)
+                combined_data['Average LLMs'] = all_returns['Average_LLMs']
+                combined_data['NASDAQ'] = market_data['NASDAQ']
+                combined_data['S&P 500'] = market_data['S&P 500']
+                combined_data['DOW JONES'] = market_data['DOW JONES']
+
+                # 过滤掉NaN值
+                combined_data = combined_data.fillna(method='ffill').fillna(method='bfill')
+
+                # 准备ECharts图表数据
+                series = []
+                for column in combined_data.columns:
+                    line_type = "solid"
+                    line_width = 2
+                    # 为"Average LLMs"设置特殊样式
+                    if column == 'Average LLMs':
+                        line_width = 4
+                        line_type = "solid"
+
+                    series.append({
+                        'name': column,
+                        'type': 'line',
+                        'data': combined_data[column].tolist(),
+                        'smooth': True,
+                        'symbol': 'none',
+                        'lineStyle': {
+                            'width': line_width,
+                            'type': line_type
+                        }
+                    })
+
+                # 设置ECharts图表选项
+                chart_options = {
+                    'title': {'text': 'LLMs vs Market Indices Comparison'},
+                    'tooltip': {
+                        'trigger': 'axis',
+                    },
+                    'legend': {
+                        'data': combined_data.columns.tolist(),
+                        'bottom': 45
+                    },
+                    'grid': {
+                        'left': '3%',
+                        'right': '4%',
+                        'bottom': '15%',
+                        'containLabel': True
+                    },
+                    'xAxis': {
+                        'type': 'category',
+                        'data': [d.strftime('%Y-%m-%d') for d in combined_data.index],
+                        'axisLabel': {
+                            'rotate': 45
+                        }
+                    },
+                    'yAxis': {
+                        'type': 'value',
+                        'name': 'Cumulative Return (%)',
+                        'axisLabel': {
+                            'formatter': '{value}%'
+                        },
+                        'scale': True
+                    },
+                    'series': series,
+                    'dataZoom': [
+                        {
+                            'type': 'slider',
+                            'xAxisIndex': 0,
+                            'start': 0,
+                            'end': 100,
+                            'bottom': 10,
+                            'minSpan': 20,  # 最小缩放级别 (20%)
+                            'maxSpan': 100,  # 最大缩放级别 (100%)
+                            'zoomLock': False
+                        },
+                        {
+                            'type': 'inside',
+                            'xAxisIndex': 0,
+                            'start': 0,
+                            'end': 100,
+                            'minSpan': 20,
+                            'maxSpan': 100,
+                            'zoomOnMouseWheel': False,
+                            'moveOnMouseWheel': True
+                        }
+                    ]
+                }
+
+                # 显示图表
+                st_echarts(options=chart_options, height='500px')
+
+                # 添加说明文本
+                st.caption("Note: Market index data is simulated for demonstration purposes. In a real application, accurate historical market data should be used.")
+            else:
+                st.warning("Insufficient data to display comparison chart.")
+        else:
+            st.warning("No timestamp data available for models to create comparison chart.")
+        # --- End of Moved Comparison Chart ---
+
+        # --- Display Overall Market Dashboard --- (Now below the chart)
+        if not table_data.empty:
+            # 计算关键指标
+            total_value = table_data['Current Total Value ($)'].sum()
+
+            # 平均回报率
+            avg_return = table_data['Total Return (%)'].mean() if 'Total Return (%)' in table_data.columns else None
+
+            # 最佳表现模型
+            best_model_idx = table_data['Total Return (%)'].idxmax() if 'Total Return (%)' in table_data.columns else None
+            best_model = table_data.loc[best_model_idx, 'LLM Model'] if best_model_idx is not None else "N/A"
+            best_return = table_data.loc[best_model_idx, 'Total Return (%)'] if best_model_idx is not None else None
+
+            # 显示整体仪表板
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.metric("Total Investment Value", f"${total_value:,.2f}" if pd.notna(total_value) else "N/A")
+
+            with col2:
+                st.metric("Average Return", f"{avg_return:.2f}%" if pd.notna(avg_return) else "N/A")
+
+            with col3:
+                st.metric("Best Performing Model", best_model)
+
+            with col4:
+                st.metric("Best Model Return", f"{best_return:.2f}%" if pd.notna(best_return) else "N/A")
+        # --- End of Metrics Section ---
+
+        # --- Display Summary Table for All Experiments --- (Remains at the end)
+        # st.subheader("Experiment Summary & Ranking")
         table_data = calculate_experiment_stats(config_df, portfolio_df_orig)
 
         if not table_data.empty:
@@ -548,7 +755,7 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
 
     else: # A specific experiment is selected
         # --- Display Dashboard for the Selected Experiment ---
-        st.subheader(f"Dashboard for {selected_exp_name}")
+        # st.subheader(f"Dashboard for {selected_exp_name}")
 
         if selected_exp_name in exp_name_to_id:
             selected_config_id = exp_name_to_id[selected_exp_name]
@@ -557,87 +764,51 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
             exp_config = config_df[config_df['id'] == selected_config_id].iloc[0]
 
             if not exp_data.empty:
-                # --- Calculate Metrics for Selected Experiment ---
-                latest_row = exp_data.iloc[-1]
-                latest_value = latest_row['total_value']
-                latest_date = latest_row['timestamp'].strftime('%Y-%m-%d')
-                start_date = exp_data['timestamp'].min().strftime('%Y-%m-%d')
+                # --- Performance Trend Chart (Moved Above Metrics) ---
+                # st.subheader("Performance Trend (Market Comparison)")
 
-                daily_return = calculate_last_daily_return(exp_data['total_value'])
-                cum_return_series = calculate_cumulative_return(exp_data['total_value'])
-                total_return = cum_return_series.iloc[-1] if not cum_return_series.empty else None
-
-                # --- Dashboard Layout --- 
-                col1, col2, col3 = st.columns(3)
-
-                with col1:
-                    st.metric("Total Return", f"{total_return:.2f}%" if pd.notna(total_return) else "N/A")
-                    st.metric("Latest Daily Return", f"{daily_return:.2f}%" if pd.notna(daily_return) else "N/A")
-
-                with col2:
-                    st.metric("Current Total Value", f"${latest_value:,.2f}" if pd.notna(latest_value) else "N/A")
-                    st.metric("Data Range", f"{start_date} to {latest_date}")
-
-                with col3:
-                    # Placeholder for other info or maybe rank if we fetch it?
-                    st.metric("LLM Model", exp_config.get('llm_model', 'N/A'))
-                    # Example: Displaying description if available
-                    st.caption(f"Description: {exp_config.get('description', 'No description provided.')}")
-
-                st.divider()
-
-                # --- Display Holdings --- 
-                st.subheader("Current Holdings")
-                latest_holdings_json = latest_row['holdings']
-                display_holdings_dashboard(latest_holdings_json, latest_value)
-                
-                st.divider()
-                
-                # --- Optional: Mini Chart --- 
-                st.subheader("Performance Trend (Market Comparison)")
-                
                 # Create market benchmark data (simulated data)
                 # In a real environment, this data should be obtained from financial data providers
                 if not exp_data.empty:
                     # Get experiment start and end dates for creating benchmark data with the same timeframe
-                    start_date = exp_data['timestamp'].min()
-                    end_date = exp_data['timestamp'].max()
-                    date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-                    
+                    start_date_dt = exp_data['timestamp'].min() # Use datetime object
+                    end_date_dt = exp_data['timestamp'].max() # Use datetime object
+                    date_range = pd.date_range(start=start_date_dt, end=end_date_dt, freq='D')
+
                     # Create simulated market index dataframe
                     market_data = pd.DataFrame(index=date_range)
-                    
+
                     # Simulate initial values and changes for three major indices
                     # These are example values, should be replaced with actual historical data
                     np.random.seed(42)  # Ensure result consistency
-                    
+
                     # Basic pattern + random fluctuation
-                    nasdaq_changes = np.concatenate([np.linspace(0, 0.15, len(date_range)//2), 
+                    nasdaq_changes = np.concatenate([np.linspace(0, 0.15, len(date_range)//2),
                                                    np.linspace(0.15, 0.25, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.02, len(date_range))
-                    sp500_changes = np.concatenate([np.linspace(0, 0.10, len(date_range)//2), 
+                    sp500_changes = np.concatenate([np.linspace(0, 0.10, len(date_range)//2),
                                                   np.linspace(0.10, 0.18, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.015, len(date_range))
-                    dow_changes = np.concatenate([np.linspace(0, 0.08, len(date_range)//2), 
+                    dow_changes = np.concatenate([np.linspace(0, 0.08, len(date_range)//2),
                                                 np.linspace(0.08, 0.15, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.01, len(date_range))
-                    
+
                     # Convert to cumulative returns
                     market_data['NASDAQ'] = (1 + nasdaq_changes) * 100 - 100
-                    market_data['S&P 500'] = (1 + sp500_changes) * 100 - 100  
+                    market_data['S&P 500'] = (1 + sp500_changes) * 100 - 100
                     market_data['DOW JONES'] = (1 + dow_changes) * 100 - 100
-                    
+
                     # Align market data dates with experiment data
                     market_data_aligned = market_data.asof(exp_data['timestamp'])
                     market_data_aligned.index = exp_data['timestamp']
-                    
+
                     # Calculate experiment's cumulative return
                     exp_return_series = calculate_cumulative_return(exp_data['total_value'])
-                    
+
                     # Merge experiment returns with market data
                     combined_data = pd.DataFrame(index=exp_data['timestamp'])
                     combined_data[f'{selected_exp_name} Return'] = exp_return_series.values
                     combined_data['NASDAQ'] = market_data_aligned['NASDAQ']
                     combined_data['S&P 500'] = market_data_aligned['S&P 500']
                     combined_data['DOW JONES'] = market_data_aligned['DOW JONES']
-                    
+
                     # Use st_echarts for more control over the chart
                     series = []
                     for column in combined_data.columns:
@@ -648,16 +819,15 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                             'smooth': True,
                             'symbol': 'none'
                         })
-                    
+
                     chart_options = {
                         'title': {'text': 'Performance Comparison with Market Indices'},
                         'tooltip': {
                             'trigger': 'axis',
-                            'formatter': '{a0}: {c0}%<br>{a1}: {c1}%<br>{a2}: {c2}%<br>{a3}: {c3}%'
                         },
                         'legend': {
                             'data': combined_data.columns.tolist(),
-                            'bottom': 35
+                            'bottom': 45
                         },
                         'grid': {
                             'left': '3%',
@@ -688,7 +858,8 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                                 'end': 100,
                                 'bottom': 10,
                                 'minSpan': 20,  # Minimum zoom level (20%)
-                                'maxSpan': 100  # Maximum zoom level (100%)
+                                'maxSpan': 100,  # Maximum zoom level (100%)
+                                'zoomLock': False
                             },
                             {
                                 'type': 'inside',
@@ -696,17 +867,58 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                                 'start': 0,
                                 'end': 100,
                                 'minSpan': 20,  # Minimum zoom level (20%)
-                                'maxSpan': 100  # Maximum zoom level (100%)
+                                'maxSpan': 100,  # Maximum zoom level (100%)
+                                'zoomOnMouseWheel': False,  # Disable zoom on mouse wheel
+                                'moveOnMouseWheel': True   # Allow panning with mouse wheel
                             }
                         ]
                     }
-                    
+
                     st_echarts(options=chart_options, height='500px')
-                    
+
                     # Add explanation text
                     st.caption("Note: Market index data is simulated for demonstration purposes. In a real application, accurate historical market data should be used.")
                 else:
                     st.warning("Unable to display performance trend: insufficient data")
+                # --- End of Moved Performance Trend Chart ---
+
+                # --- Calculate Metrics for Selected Experiment --- (Now below chart)
+                latest_row = exp_data.iloc[-1]
+                latest_value = latest_row['total_value']
+                latest_date = latest_row['timestamp'].strftime('%Y-%m-%d')
+                start_date = exp_data['timestamp'].min().strftime('%Y-%m-%d') # Already used above, keep for metrics
+
+                daily_return = calculate_last_daily_return(exp_data['total_value'])
+                cum_return_series = calculate_cumulative_return(exp_data['total_value'])
+                total_return = cum_return_series.iloc[-1] if not cum_return_series.empty else None
+
+                # --- Dashboard Layout --- 
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric("Total Return", f"{total_return:.2f}%" if pd.notna(total_return) else "N/A")
+                    st.metric("Latest Daily Return", f"{daily_return:.2f}%" if pd.notna(daily_return) else "N/A")
+
+                with col2:
+                    st.metric("Current Total Value", f"${latest_value:,.2f}" if pd.notna(latest_value) else "N/A")
+                    st.metric("Start Date", start_date)
+
+                with col3:
+                    # Placeholder for other info or maybe rank if we fetch it?
+                    st.metric("LLM Model", exp_config.get('llm_model', 'N/A'))
+                    st.metric("Update Date", latest_date)  # 添加最新更新日期
+                # --- End of Metrics Section ---
+
+                # st.divider() # Divider remains commented out
+
+                # --- Display Holdings --- (Remains after metrics)
+                st.subheader("Current Holdings")
+                latest_holdings_json = latest_row['holdings']
+                display_holdings_dashboard(latest_holdings_json, latest_value)
+
+                # st.divider() # Divider remains commented out
+
+                # --- Optional: Mini Chart --- (This section is now empty as the chart moved)
 
             else:
                 st.warning(f"No portfolio data found for experiment: {selected_exp_name}")
@@ -783,20 +995,23 @@ def display_holdings_dashboard(holdings_json_str, total_value):
         st.exception(e)
 
 def display_agent_lab():
-    st.subheader("Agent Lab")
-    st.write("Content for Agent Lab page goes here.")
+    # Call the imported function
+    agent_lab.display_agent_lab()
 
 def display_about_us():
-    st.subheader("About Us")
-    st.write("Content for About Us page goes here.")
+    # st.subheader("About Us")
+    # st.write("Content for About Us page goes here.")
+    about_us.display_about_us() # <-- Changed call
 
 def display_markets():
-    st.subheader("Markets")
-    st.write("Content for Markets page goes here.")
+    # st.subheader("Markets")
+    # st.write("Content for Markets page goes here.")
+    markets.display_markets() # <-- Changed call
 
 def display_reports():
-    st.subheader("Reports")
-    st.write("Content for Reports page goes here.")
+    # st.subheader("Reports")
+    # st.write("Content for Reports page goes here.")
+    reports.display_reports() # <-- Changed call
 
 # --- Main App Logic --- 
 
@@ -866,7 +1081,9 @@ st.title("💰DEEPFUND🔥--The First AI Live Investment Arena")
 
 # --- Links and Introduction Text ---
 links_md = """ 
-[WeChat](#WeChat) | [Twitter](#twitter) | [小红书](#小红书) | [GitHub](#github) | [Paper](#paper) | [BiliBili](#BiliBili)
+<span style="font-size: 1.3em;">
+
+[WeChat](#WeChat) | [Twitter](#twitter) | [小红书](#小红书) | [GitHub](https://github.com/HKUSTDial/deepfund) | [Paper](http://arxiv.org/abs/2503.18313) | [BiliBili](#BiliBili)
 """
 st.markdown(links_md, unsafe_allow_html=True)
 
@@ -879,13 +1096,16 @@ We evaluate the trading capability of LLM across various financial markets given
 The LLM shall ingest external information, drive a multi-agent system, and make trading decisions. 
 The LLM performance will be presented in a trading arena view across various dimensions.
 <br><br>
-**DeepFund Arena thrives on community engagement — cast your vote to help improve AI evaluation!**
+**DeepFund Arena thrives on community engagement — you can customize your own LLM agent and compete with others!**
+
+<span style="display: inline-block; border: 2px solid #17a2b8; border-radius: 8px; padding: 8px 15px; color: #17a2b8;">
+Join us to explore the future of AI investment by <a href="https://github.com/HKUSTDial/deepfund" target="_blank" style="color: #17a2b8; text-decoration: none;">⚙️ Customize Your Own LLM Agent</a>
 </span>
 """
 st.markdown(intro_md, unsafe_allow_html=True)
 
 
-st.divider() # Add a visual separator before the menu
+# st.divider() # Add a visual separator before the menu (Commented out)
 
 # --- Main Content Area (Conditional on Data Load) ---
 if data_loaded_successfully and config_df is not None and portfolio_df_indexed is not None and portfolio_df_orig is not None:
@@ -913,9 +1133,11 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
     elif selected_page == "About Us":
         display_about_us()
     elif selected_page == "Markets":
-        display_markets()
+        # display_markets()
+        markets.display_markets() # <-- Also update the call here
     elif selected_page == "Reports":
-        display_reports()
+        # display_reports()
+        reports.display_reports() # <-- Also update the call here
 
 else:
      st.warning("App cannot display main content because data failed to load correctly.")
