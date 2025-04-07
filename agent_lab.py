@@ -1,7 +1,7 @@
 import streamlit as st
 
 def display_agent_lab():
-    st.title("🧪 Agent Lab  - Build & Deploy Your AI Analysts")
+    st.title("🧪 Agent Lab  - Build & Deploy Your AI Analysts 🤖")
     # st.write("Welcome to the Agent Lab!") # Remove generic welcome
 
     st.markdown("""

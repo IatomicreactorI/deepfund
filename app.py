@@ -396,7 +396,7 @@ def get_banner_data(config_df, portfolio_df_orig):
 # --- Page Display Functions ---
 
 def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
-    st.title("🏆 Leaderboard for All LLM Models in Stock Market")
+    st.title("🏆 Leaderboard for All LLM Models in Stock Market 📈")
 
     # --- Chart Section (Existing Logic) ---
     # Allow user to select an experiment/workflow
@@ -1117,7 +1117,7 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         default_index=0,
         orientation="horizontal",
         styles={
-            "container": {"padding": "0!important", "background-color": "#fafafa", "margin-bottom": "15px"},
+            "container": {"padding": "0!important", "background-color": "#fafafa", "margin-bottom": "15px", "text-align": "left"},
             "icon": {"color": "orange", "font-size": "20px"},
             "nav-link": {"font-size": "16px", "text-align": "center", "margin":"0px", "--hover-color": "#eee"},
             "nav-link-selected": {"background-color": "#02ab21"},

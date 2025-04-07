@@ -1,7 +1,7 @@
 import streamlit as st
 
 def display_about_us():
-    st.title("🔥 About DeepFund ")
+    st.title("🔥 About DeepFund 💰")
 
     st.markdown("""
     ### Will LLMs Be Professional At Fund Investment? A Live Arena Perspective
