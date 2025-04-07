@@ -1,11 +1,19 @@
 import streamlit as st
 
 def display_about_us():
-    st.subheader("About DeepFund 🔥")
+    st.title("🔥 About DeepFund ")
 
     st.markdown("""
     ### Will LLMs Be Professional At Fund Investment? A Live Arena Perspective
+    """)
     
+    # Add Arena Figure
+    try:
+        st.image("image/arenafig.png", caption="DeepFund Live Investment Arena")
+    except FileNotFoundError:
+        st.caption("(Arena diagram described in project README - image/arenafig.png not found)")
+
+    st.markdown("""    
     **DeepFund** is a project dedicated to evaluating the trading capabilities of Large Language Models (LLMs) 
     across various financial markets within a unified environment. 
     
@@ -22,15 +30,15 @@ def display_about_us():
     *   A simulated environment allowing for performance evaluation across various dimensions.
     """)
     
-    # Consider adding the framework image if it's accessible to the Streamlit app
-    # try:
-    #     st.image("image/framework.png", caption="DeepFund System Framework")
-    # except FileNotFoundError:
-    #     st.caption("(Framework diagram described in project README)")
+    st.markdown("### System Framework")
     st.markdown("The system framework involves data ingestion, a multi-agent workflow (potentially orchestrated by a planner agent), LLM inference for analysis and decision-making, and database interaction to store configurations, portfolio states, decisions, and signals.")
+    # Add Framework Figure
+    try:
+        st.image("image/framework.png", caption="DeepFund System Framework")
+    except FileNotFoundError:
+        st.caption("(Framework diagram described in project README - image/framework.png not found)")
 
-
-    st.divider()
+    # st.divider()
     
     st.markdown("""
     **Community and Collaboration:**
@@ -43,7 +51,7 @@ def display_about_us():
     *   **Research Paper:** [arXiv:2503.18313](http://arxiv.org/abs/2503.18313)
     """)
     
-    st.divider()
+    # st.divider()
 
     st.subheader("Acknowledgements")
     st.markdown("""
@@ -57,7 +65,7 @@ def display_about_us():
     We are grateful for their contributions to the community.
     """)
 
-    st.divider()
+    # st.divider()
 
     st.subheader("Disclaimer")
     st.warning("This project is for educational and research purposes only. It **DOES NOT** execute real trades or provide financial advice.")

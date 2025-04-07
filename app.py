@@ -396,7 +396,7 @@ def get_banner_data(config_df, portfolio_df_orig):
 # --- Page Display Functions ---
 
 def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
-    st.subheader("Overall Leaderboard for All LLM Models in American Stock Market")
+    st.title("🏆 Leaderboard for All LLM Models in Stock Market")
 
     # --- Chart Section (Existing Logic) ---
     # Allow user to select an experiment/workflow
