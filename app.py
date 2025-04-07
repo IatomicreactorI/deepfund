@@ -3,6 +3,7 @@ import pandas as pd
 from streamlit_echarts import st_echarts
 from streamlit_option_menu import option_menu
 import json # Needed for parsing holdings
+import numpy as np
 
 st.set_page_config(layout="wide")
 
@@ -130,6 +131,7 @@ h3[data-testid="stHeading"] {
      margin-top: 0.8rem !important; /* Keep slightly more space above subheaders */
      margin-bottom: 0.3rem !important;
 }
+
 </style>
 """
 
@@ -176,96 +178,135 @@ def format_holdings(holdings_json_str, total_value):
     except Exception:
         return "Error processing Holdings"
 
-# --- Function to Calculate Stats for Leaderboard Table --- 
+# --- Function to Calculate Stats for Leaderboard Table ---
 def calculate_experiment_stats(config_df, portfolio_df_orig):
-    """Calculates detailed stats for each experiment for the leaderboard table."""
+    """Calculates detailed stats for each experiment for the leaderboard table, including rank change."""
     if portfolio_df_orig is None or portfolio_df_orig.empty or config_df is None or config_df.empty:
-        return pd.DataFrame() # Return empty dataframe if no data
+        return pd.DataFrame()
 
-    all_stats = []
-
-    # Ensure timestamp is datetime
+    # Ensure timestamp is datetime and sort globally first
     if not pd.api.types.is_datetime64_any_dtype(portfolio_df_orig['timestamp']):
         portfolio_df_orig['timestamp'] = pd.to_datetime(portfolio_df_orig['timestamp'], errors='coerce')
-        portfolio_df_orig.dropna(subset=['timestamp'], inplace=True)
+    portfolio_df_orig = portfolio_df_orig.dropna(subset=['timestamp']).sort_values('timestamp')
 
     grouped = portfolio_df_orig.groupby('config_id')
 
+    latest_day_stats = []
+    previous_day_returns = [] # Store {config_id: return} for the day before latest
+
+    # --- First Pass: Calculate latest stats and identify previous day's return ---
     for config_id, group in grouped:
         if group.empty:
             continue
 
-        group_sorted = group.sort_values('timestamp')
-        
-        # Basic Info
-        start_date = group_sorted['timestamp'].min().strftime('%Y-%m-%d')
+        group_sorted = group.sort_values('timestamp') # Already sorted globally, but good practice
+
+        # Latest day calculations
         latest_row = group_sorted.iloc[-1]
+        latest_date = latest_row['timestamp']
         latest_total_value = latest_row['total_value']
         latest_holdings_str = latest_row['holdings']
-
-        # Calculations
+        start_date = group_sorted['timestamp'].min().strftime('%Y-%m-%d')
         daily_return_pct = calculate_last_daily_return(group_sorted['total_value'])
         total_cumulative_return_series = calculate_cumulative_return(group_sorted['total_value'])
-        total_return_pct = total_cumulative_return_series.iloc[-1] if not total_cumulative_return_series.empty else None
-
-        # Format Holdings
-        holdings_formatted = format_holdings(latest_holdings_str, latest_total_value)
+        total_return_pct_latest = total_cumulative_return_series.iloc[-1] if not total_cumulative_return_series.empty else None
 
         # Get Config Info
         config_info = config_df[config_df['id'] == config_id].iloc[0] if config_id in config_df['id'].values else None
         exp_name = config_info['exp_name'] if config_info is not None else f"Unknown ({config_id[:6]}...)"
         llm_model = config_info['llm_model'] if config_info is not None else "N/A"
 
-        all_stats.append({
+        latest_day_stats.append({
             'config_id': config_id,
             'LLM Model': llm_model,
             'Start Date': start_date,
+            'End Date': latest_date, # Add End Date (will format later)
             'Decision Accuracy (%)': 'N/A', # Placeholder
             'Daily Return (%)': daily_return_pct,
             'Analyst Portfolio': 'N/A', # Placeholder
-            'Total Return (%)': total_return_pct,
+            'Total Return (%)': total_return_pct_latest,
             'Current Total Value ($)': latest_total_value,
-            # 'Current Holdings (%)': holdings_formatted, # Removed
-            # 'Composite Score': 'N/A', # Removed
-            # 'License': 'N/A', # Removed
-            # 'API Cost ($)': 'N/A' # Removed
         })
 
-    if not all_stats:
+        # Previous day calculation (if exists)
+        if len(group_sorted) >= 2:
+            previous_day_data = group_sorted.iloc[:-1]['total_value']
+            if not previous_day_data.empty:
+                 previous_cumulative_return_series = calculate_cumulative_return(previous_day_data)
+                 total_return_pct_previous = previous_cumulative_return_series.iloc[-1] if not previous_cumulative_return_series.empty else None
+                 if pd.notna(total_return_pct_previous):
+                     previous_day_returns.append({
+                         'config_id': config_id,
+                         'Previous Total Return (%)': total_return_pct_previous
+                     })
+
+
+    if not latest_day_stats:
         return pd.DataFrame()
 
-    stats_df = pd.DataFrame(all_stats)
+    # --- Second Pass: Calculate Ranks and Rank Change ---
+    latest_stats_df = pd.DataFrame(latest_day_stats)
 
-    # Calculate Rank based on Total Return (%)
-    stats_df = stats_df.sort_values(by='Total Return (%)', ascending=False, na_position='last')
-    stats_df.insert(0, 'Rank', range(1, len(stats_df) + 1))
-    # Add Placeholder Rank Change column
-    stats_df['Rank Change'] = 'N/A' # Placeholder - requires historical data
+    # Calculate current rank
+    latest_stats_df = latest_stats_df.sort_values(by='Total Return (%)', ascending=False, na_position='last')
+    latest_stats_df['Rank'] = range(1, len(latest_stats_df) + 1)
 
-    # --- Defer formatting to display function ---
-    # stats_df['Daily Return (%)'] = stats_df['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-    # stats_df['Total Return (%)'] = stats_df['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-    # stats_df['Current Total Value ($)'] = stats_df['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
+    # Calculate previous rank (if data exists)
+    if previous_day_returns:
+        previous_stats_df = pd.DataFrame(previous_day_returns)
+        previous_stats_df = previous_stats_df.sort_values(by='Previous Total Return (%)', ascending=False, na_position='last')
+        previous_stats_df['Previous Rank'] = range(1, len(previous_stats_df) + 1)
+
+        # Merge previous rank into latest stats
+        final_stats_df = pd.merge(latest_stats_df, previous_stats_df[['config_id', 'Previous Rank']], on='config_id', how='left')
+
+        # Calculate Rank Change
+        final_stats_df['Rank Change Raw'] = final_stats_df['Previous Rank'] - final_stats_df['Rank']
+
+        # Format Rank Change
+        def format_rank_change(row):
+            if pd.isna(row['Previous Rank']):
+                return 'New'
+            change = row['Rank Change Raw']
+            if pd.isna(change): # Should not happen if Previous Rank exists, but safety check
+                return 'N/A'
+            elif change == 0:
+                return '0'
+            elif change > 0:
+                return f"+{int(change)}"
+            else:
+                return f"{int(change)}"
+
+        final_stats_df['Rank Change'] = final_stats_df.apply(format_rank_change, axis=1)
+        final_stats_df = final_stats_df.drop(columns=['Rank Change Raw', 'Previous Rank']) # Clean up temp columns
+
+    else:
+        # No previous data available for any experiment
+        final_stats_df = latest_stats_df
+        final_stats_df['Rank Change'] = 'New'
+
+
+    # Format End Date
+    final_stats_df['End Date'] = final_stats_df['End Date'].dt.strftime('%Y-%m-%d')
+
+    # --- Defer numeric formatting to display function ---
 
     # Select and reorder columns for final display
     final_columns = [
         'Rank',
-        'Rank Change', # Added placeholder
+        'Rank Change', # Now calculated
         'LLM Model',
         'Start Date',
+        'End Date', # Added
         'Decision Accuracy (%)',
         'Daily Return (%)',
         'Analyst Portfolio',
         'Total Return (%)',
         'Current Total Value ($)',
-        # 'Current Holdings (%)', # Removed
-        # 'Composite Score', # Removed
-        # 'License', # Removed
-        # 'API Cost ($)' # Removed
     ]
-    # Ensure only existing columns are selected
-    final_columns = [col for col in final_columns if col in stats_df.columns] 
-    return stats_df[final_columns]
+    # Ensure only existing columns are selected and in order
+    final_stats_df = final_stats_df[[col for col in final_columns if col in final_stats_df.columns]]
+    return final_stats_df
 
 # --- Data Calculation for Banners (Keep existing, maybe refactor later) --- 
 def get_banner_data(config_df, portfolio_df_orig):
@@ -470,39 +511,276 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
         else:
             st.warning(f"No suitable data found to display Cumulative Return for experiment: {selected_exp_name}. Ensure sufficient data points exist.")
 
-    # --- Summary Table Section --- 
-    st.divider() # Add a visual separator
-    st.subheader("Experiment Summary & Ranking")
+    # --- Summary Table / Single Experiment Dashboard Section ---
+    st.divider()
 
-    # Calculate table data using the new helper function
-    table_data = calculate_experiment_stats(config_df, portfolio_df_orig)
+    if selected_exp_name == "All":
+        # --- Display Summary Table for All Experiments ---
+        st.subheader("Experiment Summary & Ranking")
+        table_data = calculate_experiment_stats(config_df, portfolio_df_orig)
 
-    if not table_data.empty:
-        # Apply formatting before styling
-        table_data_formatted = table_data.copy()
-        table_data_formatted['Daily Return (%)'] = table_data_formatted['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-        table_data_formatted['Total Return (%)'] = table_data_formatted['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
-        table_data_formatted['Current Total Value ($)'] = table_data_formatted['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
+        if not table_data.empty:
+            # Apply formatting before styling
+            table_data_formatted = table_data.copy()
+            table_data_formatted['Daily Return (%)'] = table_data_formatted['Daily Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+            table_data_formatted['Total Return (%)'] = table_data_formatted['Total Return (%)'].map(lambda x: f'{x:.2f}%' if pd.notna(x) else 'N/A')
+            table_data_formatted['Current Total Value ($)'] = table_data_formatted['Current Total Value ($)'].map(lambda x: f'${x:,.2f}' if pd.notna(x) else 'N/A')
 
-        # Apply Styling
-        styled_table = table_data_formatted.style.set_properties(
-            subset=['Rank', 'Rank Change'], 
-            **{'text-align': 'left'}
-        ).set_properties(
-            subset=['Daily Return (%)', 'Total Return (%)', 'Current Total Value ($)'], 
-            **{'text-align': 'right'}
-        )
+            # Apply Styling
+            styled_table = table_data_formatted.style.set_properties(
+                subset=['Rank', 'Rank Change'],
+                **{'text-align': 'left'}
+            ).set_properties(
+                subset=['Daily Return (%)', 'Total Return (%)', 'Current Total Value ($)'],
+                **{'text-align': 'right'}
+            )
 
-        # Calculate dynamic height: (num_rows + header) * pixels_per_row + buffer
-        dynamic_height = (len(table_data) + 1) * 35 + 3 
-        st.dataframe(
-            styled_table, # Use the styled table
-            use_container_width=True, 
-            hide_index=True, 
-            height=dynamic_height # Set the calculated height
-        )
-    else:
-        st.info("No experiment data available to display the summary table.")
+            # Calculate dynamic height
+            dynamic_height = (len(table_data) + 1) * 35 + 3
+            st.dataframe(
+                styled_table, # Use the styled table
+                use_container_width=True,
+                hide_index=True,
+                height=dynamic_height
+            )
+        else:
+            st.info("No experiment data available to display the summary table.")
+
+    else: # A specific experiment is selected
+        # --- Display Dashboard for the Selected Experiment ---
+        st.subheader(f"Dashboard for {selected_exp_name}")
+
+        if selected_exp_name in exp_name_to_id:
+            selected_config_id = exp_name_to_id[selected_exp_name]
+            # Filter data for the selected experiment
+            exp_data = portfolio_df_orig[portfolio_df_orig['config_id'] == selected_config_id].sort_values('timestamp')
+            exp_config = config_df[config_df['id'] == selected_config_id].iloc[0]
+
+            if not exp_data.empty:
+                # --- Calculate Metrics for Selected Experiment ---
+                latest_row = exp_data.iloc[-1]
+                latest_value = latest_row['total_value']
+                latest_date = latest_row['timestamp'].strftime('%Y-%m-%d')
+                start_date = exp_data['timestamp'].min().strftime('%Y-%m-%d')
+
+                daily_return = calculate_last_daily_return(exp_data['total_value'])
+                cum_return_series = calculate_cumulative_return(exp_data['total_value'])
+                total_return = cum_return_series.iloc[-1] if not cum_return_series.empty else None
+
+                # --- Dashboard Layout --- 
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric("Total Return", f"{total_return:.2f}%" if pd.notna(total_return) else "N/A")
+                    st.metric("Latest Daily Return", f"{daily_return:.2f}%" if pd.notna(daily_return) else "N/A")
+
+                with col2:
+                    st.metric("Current Total Value", f"${latest_value:,.2f}" if pd.notna(latest_value) else "N/A")
+                    st.metric("Data Range", f"{start_date} to {latest_date}")
+
+                with col3:
+                    # Placeholder for other info or maybe rank if we fetch it?
+                    st.metric("LLM Model", exp_config.get('llm_model', 'N/A'))
+                    # Example: Displaying description if available
+                    st.caption(f"Description: {exp_config.get('description', 'No description provided.')}")
+
+                st.divider()
+
+                # --- Display Holdings --- 
+                st.subheader("Current Holdings")
+                latest_holdings_json = latest_row['holdings']
+                display_holdings_dashboard(latest_holdings_json, latest_value)
+                
+                st.divider()
+                
+                # --- Optional: Mini Chart --- 
+                st.subheader("Performance Trend (Market Comparison)")
+                
+                # Create market benchmark data (simulated data)
+                # In a real environment, this data should be obtained from financial data providers
+                if not exp_data.empty:
+                    # Get experiment start and end dates for creating benchmark data with the same timeframe
+                    start_date = exp_data['timestamp'].min()
+                    end_date = exp_data['timestamp'].max()
+                    date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+                    
+                    # Create simulated market index dataframe
+                    market_data = pd.DataFrame(index=date_range)
+                    
+                    # Simulate initial values and changes for three major indices
+                    # These are example values, should be replaced with actual historical data
+                    np.random.seed(42)  # Ensure result consistency
+                    
+                    # Basic pattern + random fluctuation
+                    nasdaq_changes = np.concatenate([np.linspace(0, 0.15, len(date_range)//2), 
+                                                   np.linspace(0.15, 0.25, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.02, len(date_range))
+                    sp500_changes = np.concatenate([np.linspace(0, 0.10, len(date_range)//2), 
+                                                  np.linspace(0.10, 0.18, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.015, len(date_range))
+                    dow_changes = np.concatenate([np.linspace(0, 0.08, len(date_range)//2), 
+                                                np.linspace(0.08, 0.15, len(date_range) - len(date_range)//2)]) + np.random.normal(0, 0.01, len(date_range))
+                    
+                    # Convert to cumulative returns
+                    market_data['NASDAQ'] = (1 + nasdaq_changes) * 100 - 100
+                    market_data['S&P 500'] = (1 + sp500_changes) * 100 - 100  
+                    market_data['DOW JONES'] = (1 + dow_changes) * 100 - 100
+                    
+                    # Align market data dates with experiment data
+                    market_data_aligned = market_data.asof(exp_data['timestamp'])
+                    market_data_aligned.index = exp_data['timestamp']
+                    
+                    # Calculate experiment's cumulative return
+                    exp_return_series = calculate_cumulative_return(exp_data['total_value'])
+                    
+                    # Merge experiment returns with market data
+                    combined_data = pd.DataFrame(index=exp_data['timestamp'])
+                    combined_data[f'{selected_exp_name} Return'] = exp_return_series.values
+                    combined_data['NASDAQ'] = market_data_aligned['NASDAQ']
+                    combined_data['S&P 500'] = market_data_aligned['S&P 500']
+                    combined_data['DOW JONES'] = market_data_aligned['DOW JONES']
+                    
+                    # Use st_echarts for more control over the chart
+                    series = []
+                    for column in combined_data.columns:
+                        series.append({
+                            'name': column,
+                            'type': 'line',
+                            'data': combined_data[column].tolist(),
+                            'smooth': True,
+                            'symbol': 'none'
+                        })
+                    
+                    chart_options = {
+                        'title': {'text': 'Performance Comparison with Market Indices'},
+                        'tooltip': {
+                            'trigger': 'axis',
+                            'formatter': '{a0}: {c0}%<br>{a1}: {c1}%<br>{a2}: {c2}%<br>{a3}: {c3}%'
+                        },
+                        'legend': {
+                            'data': combined_data.columns.tolist(),
+                            'bottom': 35
+                        },
+                        'grid': {
+                            'left': '3%',
+                            'right': '4%',
+                            'bottom': '15%',
+                            'containLabel': True
+                        },
+                        'xAxis': {
+                            'type': 'category',
+                            'data': [d.strftime('%Y-%m-%d') for d in combined_data.index],
+                            'axisLabel': {
+                                'rotate': 45
+                            }
+                        },
+                        'yAxis': {
+                            'type': 'value',
+                            'axisLabel': {
+                                'formatter': '{value}%'
+                            },
+                            'scale': True
+                        },
+                        'series': series,
+                        'dataZoom': [
+                            {
+                                'type': 'slider',
+                                'xAxisIndex': 0,
+                                'start': 0,
+                                'end': 100,
+                                'bottom': 10,
+                                'minSpan': 20,  # Minimum zoom level (20%)
+                                'maxSpan': 100  # Maximum zoom level (100%)
+                            },
+                            {
+                                'type': 'inside',
+                                'xAxisIndex': 0,
+                                'start': 0,
+                                'end': 100,
+                                'minSpan': 20,  # Minimum zoom level (20%)
+                                'maxSpan': 100  # Maximum zoom level (100%)
+                            }
+                        ]
+                    }
+                    
+                    st_echarts(options=chart_options, height='500px')
+                    
+                    # Add explanation text
+                    st.caption("Note: Market index data is simulated for demonstration purposes. In a real application, accurate historical market data should be used.")
+                else:
+                    st.warning("Unable to display performance trend: insufficient data")
+
+            else:
+                st.warning(f"No portfolio data found for experiment: {selected_exp_name}")
+        else:
+            # This case should technically not be reached due to earlier check
+            st.error(f"Selected experiment '{selected_exp_name}' not found.")
+
+# --- Function to Display Holdings in Dashboard ---
+def display_holdings_dashboard(holdings_json_str, total_value):
+    """Parses holdings JSON and displays them in a structured format for the dashboard."""
+    if not holdings_json_str or holdings_json_str == '{}' or pd.isna(holdings_json_str):
+        st.info("No current holdings data available.")
+        return
+
+    try:
+        holdings_dict = json.loads(holdings_json_str)
+        if not holdings_dict:
+            st.info("Portfolio currently holds no assets (all cash).")
+            return
+
+        holdings_list = []
+        for ticker, data in holdings_dict.items():
+            value = data.get('value', 0)
+            shares = data.get('shares', 'N/A')
+            percentage = (value / total_value) * 100 if total_value and pd.notna(total_value) and total_value != 0 else 0
+            holdings_list.append({
+                'Ticker': ticker,
+                'Shares': shares,
+                'Current Value ($)': value,
+                '% of Portfolio': percentage
+            })
+
+        if not holdings_list:
+            st.info("Portfolio currently holds no assets (all cash).")
+            return
+
+        holdings_df = pd.DataFrame(holdings_list)
+        holdings_df = holdings_df.sort_values(by='% of Portfolio', ascending=False)
+
+        # Format for display
+        holdings_df_formatted = holdings_df.copy()
+        holdings_df_formatted['Current Value ($)'] = holdings_df_formatted['Current Value ($)'].map(lambda x: f"${x:,.2f}" if pd.notna(x) else "N/A")
+        holdings_df_formatted['% of Portfolio'] = holdings_df_formatted['% of Portfolio'].map(lambda x: f"{x:.2f}%")
+
+        # Use columns for better layout potentially
+        # st.dataframe(holdings_df_formatted, hide_index=True, use_container_width=True)
+
+        # Alternative: Display using st.metric or similar in columns for a card-like view
+        num_holdings = len(holdings_df)
+        cols_per_row = 4 # Adjust as needed
+        num_rows = (num_holdings + cols_per_row - 1) // cols_per_row
+
+        idx = 0
+        for r in range(num_rows):
+            cols = st.columns(cols_per_row)
+            for c in range(cols_per_row):
+                if idx < num_holdings:
+                    holding = holdings_df.iloc[idx]
+                    with cols[c]:
+                        st.metric(
+                            label=f"{holding['Ticker']}", 
+                            value=f"${holding['Current Value ($)']:,.2f}",
+                            delta=f"{holding['% of Portfolio']:.1f}% | {holding['Shares'] if holding['Shares'] != 'N/A' else '-'} Shares"
+                        )
+                    idx += 1
+                # else: # Optional: Add empty containers to fill row
+                #     with cols[c]:
+                #         st.empty()
+
+    except json.JSONDecodeError:
+        st.error("Failed to parse holdings data.")
+    except Exception as e:
+        st.error(f"An error occurred displaying holdings: {e}")
+        st.exception(e)
 
 def display_agent_lab():
     st.subheader("Agent Lab")
