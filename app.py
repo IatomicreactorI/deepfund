@@ -418,8 +418,6 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
 
     # --- Set Y-Axis to Cumulative Return Percentage --- 
     y_axis_name = "Cumulative Return (%)"
-    y_axis_formatter = '{value}%'
-    tooltip_value_formatter = "function (value) { if (value == null) return 'N/A'; return value.toFixed(2) + '%'; }"
 
     # Determine Resampling Frequency
     resample_freq = None
@@ -490,6 +488,7 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
             "tooltip": {
                 "trigger": 'axis',
                 "axisPointer": {"type": 'cross'},
+                "valueFormatter": '(value) => value ? value.toFixed(2) + "%" : "N/A"' 
             },
             "legend": {"data": legend_data, "bottom": 65, "type": 'scroll'},
             "grid": {"left": '3%', "right": '4%', "bottom": '20%', "containLabel": True},
@@ -499,8 +498,8 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
             },
             "yAxis": {
                 "type": "value",
-                "name": y_axis_name, # Use "Cumulative Return (%)"
-                "axisLabel": {"formatter": y_axis_formatter}, # Use "{value}%"
+                "name": y_axis_name,
+                "axisLabel": {},
                 "scale": True 
             },
             "series": echarts_series,
@@ -652,9 +651,7 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                     'yAxis': {
                         'type': 'value',
                         'name': 'Cumulative Return (%)',
-                        'axisLabel': {
-                            'formatter': '{value}%'
-                        },
+                        'axisLabel': {},
                         'scale': True
                     },
                     'series': series,
@@ -824,6 +821,7 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                         'title': {'text': 'Performance Comparison with Market Indices'},
                         'tooltip': {
                             'trigger': 'axis',
+                            'valueFormatter': '(value) => value ? value.toFixed(2) + "%" : "N/A"' 
                         },
                         'legend': {
                             'data': combined_data.columns.tolist(),
@@ -844,9 +842,8 @@ def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
                         },
                         'yAxis': {
                             'type': 'value',
-                            'axisLabel': {
-                                'formatter': '{value}%'
-                            },
+                            'name': 'Cumulative Return (%)',
+                            'axisLabel': {},
                             'scale': True
                         },
                         'series': series,
@@ -1109,21 +1106,29 @@ st.markdown(intro_md, unsafe_allow_html=True)
 
 # --- Main Content Area (Conditional on Data Load) ---
 if data_loaded_successfully and config_df is not None and portfolio_df_indexed is not None and portfolio_df_orig is not None:
-    selected_page = option_menu(
-        menu_title=None,
-        options=["Leaderboard", "Agent Lab", "About Us", "Markets", "Reports"],
-        icons=['graph-up', 'robot', 'info-circle', 'bank', 'file-earmark-text'],
-        menu_icon="cast",
-        default_index=0,
-        orientation="horizontal",
-        styles={
-            "container": {"padding": "0!important", "background-color": "#fafafa", "margin-bottom": "15px", "text-align": "left"},
-            "icon": {"color": "orange", "font-size": "20px"},
-            "nav-link": {"font-size": "16px", "text-align": "center", "margin":"0px", "--hover-color": "#eee"},
-            "nav-link-selected": {"background-color": "#02ab21"},
-        }
-    )
+    # --- Move Menu to Sidebar --- 
+    with st.sidebar:
+        # --- Add Logo --- 
+        st.image("image/logodeepfund.png") # Display the logo image
+        # --- End Logo ---
+        
+        selected_page = option_menu(
+            menu_title=None, # Remove text title, logo is now the title
+            options=["Leaderboard", "Agent Lab", "About Us", "Markets", "Reports"],
+            icons=['graph-up', 'robot', 'info-circle', 'bank', 'file-earmark-text'],
+            menu_icon="wallet2", 
+            default_index=0,
+            orientation="vertical", 
+            styles={ 
+                "container": {"padding": "5px !important", "background-color": "#fafafa"}, 
+                "icon": {"color": "orange", "font-size": "23px"}, 
+                "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "padding": "10px", "--hover-color": "#eee"}, 
+                "nav-link-selected": {"background-color": "#02ab21"},
+            }
+        )
+    # --- End Sidebar Menu ---
 
+    # --- Page Display Logic (remains outside sidebar) ---
     # Display the selected page content
     if selected_page == "Leaderboard":
         # Pass portfolio_df_orig to the function as well
@@ -1133,11 +1138,9 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
     elif selected_page == "About Us":
         display_about_us()
     elif selected_page == "Markets":
-        # display_markets()
-        markets.display_markets() # <-- Also update the call here
+        markets.display_markets() 
     elif selected_page == "Reports":
-        # display_reports()
-        reports.display_reports() # <-- Also update the call here
+        reports.display_reports() 
 
 else:
      st.warning("App cannot display main content because data failed to load correctly.")
