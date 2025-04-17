@@ -4,10 +4,16 @@ from streamlit_echarts import st_echarts
 from streamlit_option_menu import option_menu
 import json # Needed for parsing holdings
 import numpy as np
-import agent_lab
-import about_us # <-- Import added here
-import markets # <-- Import added here
-import reports # <-- Import added here
+
+# 修改导入语句，使用各子模块的函数
+# 注意：这里我们只导入已经完成重构的模块，对于leaderboard模块暂时保留本地实现
+from agent_lab import display_agent_lab  
+from about_us import display_about_us
+from market_pages import display_markets  # 从重构后的market_pages模块导入
+from reports import display_reports
+
+# leaderboard模块暂时不导入，因为我们还没有完成所有功能的迁移
+# 在完成迁移后，可以添加: from leaderboard import display_leaderboard
 
 st.set_page_config(layout="wide")
 
@@ -991,24 +997,21 @@ def display_holdings_dashboard(holdings_json_str, total_value):
         st.error(f"An error occurred displaying holdings: {e}")
         st.exception(e)
 
-def display_agent_lab():
-    # Call the imported function
-    agent_lab.display_agent_lab()
+def show_agent_lab():
+    # 调用导入的函数
+    display_agent_lab()
 
-def display_about_us():
-    # st.subheader("About Us")
-    # st.write("Content for About Us page goes here.")
-    about_us.display_about_us() # <-- Changed call
+def show_about_us():
+    # 调用导入的函数
+    display_about_us() 
 
-def display_markets():
-    # st.subheader("Markets")
-    # st.write("Content for Markets page goes here.")
-    markets.display_markets() # <-- Changed call
+def show_markets():
+    # 调用导入的函数
+    display_markets() 
 
-def display_reports():
-    # st.subheader("Reports")
-    # st.write("Content for Reports page goes here.")
-    reports.display_reports() # <-- Changed call
+def show_reports():
+    # 调用导入的函数
+    display_reports() 
 
 # --- Main App Logic --- 
 
@@ -1134,13 +1137,13 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         # Pass portfolio_df_orig to the function as well
         display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig)
     elif selected_page == "Agent Lab":
-        display_agent_lab()
+        show_agent_lab()
     elif selected_page == "About Us":
-        display_about_us()
+        show_about_us()
     elif selected_page == "Markets":
-        markets.display_markets() 
+        show_markets() 
     elif selected_page == "Reports":
-        reports.display_reports() 
+        show_reports() 
 
 else:
      st.warning("App cannot display main content because data failed to load correctly.")

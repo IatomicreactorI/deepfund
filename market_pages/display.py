@@ -1,31 +1,8 @@
 import streamlit as st
-import os
-
-# --- Import Sub-page Modules --- 
-# Note: This might fail if __init__.py was not created successfully
-try:
-    from market_pages import cs2_skins
-    from market_pages import crypto
-    from market_pages import gold
-    from market_pages import oil
-    from market_pages import renewables
-    from market_pages import us_stocks_full
-    sub_pages = {
-        'cs2_skins.py': cs2_skins.display_cs2_skins_market,
-        'crypto.py': crypto.display_crypto_market,
-        'gold.py': gold.display_gold_market,
-        'oil.py': oil.display_oil_market,
-        'renewables.py': renewables.display_renewables_market,
-        'us_stocks_full.py': us_stocks_full.display_us_stocks_full_market
-    }
-    imports_successful = True
-except ImportError as e:
-    st.error(f"Failed to import market sub-pages. Ensure 'market_pages/__init__.py' exists. Error: {e}")
-    imports_successful = False
-    sub_pages = {}
-# -------------------------------
+from .utils import load_subpages, get_market_hub_data
 
 def display_markets():
+    """主函数，显示市场页面内容"""
     # --- Initialize Session State --- 
     if 'market_view' not in st.session_state:
         st.session_state.market_view = 'hub' # Default view is the main hub
@@ -51,6 +28,9 @@ def display_markets():
     
     st.divider()
 
+    # 加载子页面模块
+    sub_pages, imports_successful = load_subpages()
+
     # --- Display Logic based on Session State (Hub Preview Only for non-premium) ---
     if not imports_successful:
         st.warning("Cannot display Markets page content due to import errors.")
@@ -64,16 +44,10 @@ def display_markets():
     st.subheader("📋 Market Sector Previews")
     st.markdown("Unlock premium access to view detailed pages for each sector:")
 
-    # Define market sectors (Ensure keys match the sub_pages dict)
-    markets_hub = [
-        {'name': 'Gold', 'icon': '🧈', 'file': 'gold.py', 'desc': 'Precious metals analysis and forecasts.'},
-        {'name': 'Oil', 'icon': '🛢️', 'file': 'oil.py', 'desc': 'Energy market trends and crude oil data.'},
-        {'name': 'Cryptocurrencies', 'icon': '₿', 'file': 'crypto.py', 'desc': 'Digital asset insights and blockchain news.'},
-        {'name': 'US Stocks', 'icon': '📈', 'file': 'us_stocks_full.py', 'desc': 'Comprehensive US stock market data.'},
-        {'name': 'Renewable Energy', 'icon': '🔋', 'file': 'renewables.py', 'desc': 'Green energy sector performance.'},
-        {'name': 'CS2 Skins Trading', 'icon': '🌈', 'file': 'cs2_skins.py', 'desc': 'Virtual item market analysis (CS2).'}
-    ]
+    # 获取市场数据
+    markets_hub = get_market_hub_data()
 
+    # 显示市场卡片
     col1, col2, col3 = st.columns(3)
     cols = [col1, col2, col3]
 
@@ -118,6 +92,4 @@ def display_markets():
         st.error("Invalid market view state. Returning to hub.")
         set_market_view('hub')
         st.rerun()
-    """
-
-# Ensure no other functions are defined in this file 
+    """ 
