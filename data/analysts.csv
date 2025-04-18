@@ -1,0 +1,16 @@
+name,category,description,config_path
+Financial Statement Analyst,Fundamental Analysis,Specializes in analyzing company financial statements and ratios.,configs/analysts/financial_statement.json
+Valuation Expert,Fundamental Analysis,Determines fair value of stocks using various valuation models.,configs/analysts/valuation.json
+Industry Specialist,Fundamental Analysis,Provides industry-specific insights and competitive analysis.,configs/analysts/industry.json
+Chart Pattern Analyst,Technical Analysis,Identifies and interprets chart patterns for trading signals.,configs/analysts/chart_pattern.json
+Momentum Tracker,Technical Analysis,Follows momentum indicators to identify trend strength.,configs/analysts/momentum.json
+Volatility Expert,Technical Analysis,Analyzes market volatility for trading opportunities.,configs/analysts/volatility.json
+News Sentiment Analyst,Market Sentiment,Analyzes news articles for market sentiment and impact.,configs/analysts/news_sentiment.json
+Social Media Monitor,Market Sentiment,Tracks social media trends related to financial markets.,configs/analysts/social_media.json
+Earnings Call Specialist,Market Sentiment,Extracts insights from company earnings calls and reports.,configs/analysts/earnings_call.json
+Portfolio Risk Analyst,Risk Management,Measures and monitors portfolio risk metrics.,configs/analysts/portfolio_risk.json
+Hedging Strategist,Risk Management,Develops hedging strategies to protect against downside risk.,configs/analysts/hedging.json
+Drawdown Protector,Risk Management,Focuses on minimizing drawdowns during market corrections.,configs/analysts/drawdown.json
+Economic Data Analyst,Macroeconomic,Interprets economic indicators and their market implications.,configs/analysts/economic_data.json
+Central Bank Watcher,Macroeconomic,Monitors central bank policies and interest rate decisions.,configs/analysts/central_bank.json
+Global Trade Analyst,Macroeconomic,Analyzes international trade patterns and global economic shifts.,configs/analysts/global_trade.json

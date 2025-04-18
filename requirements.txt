@@ -3,4 +3,5 @@ pandas
 numpy
 streamlit-echarts
 streamlit-option-menu
-yfinance 
+yfinance
+streamlit-extras 
