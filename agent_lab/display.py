@@ -5,6 +5,7 @@ import json
 from .analysts_selector import display_analysts_selector
 
 def display_agent_lab():
+    st.divider()
     st.title("🧪 Agent Lab - Build & Deploy Your AI Analysts 🤖")
 
     st.markdown("""
@@ -13,8 +14,6 @@ def display_agent_lab():
     Leverage the power of Large Language Models (LLMs) to build a customized 
     financial agent tailored to your investment style.
     """)
-
-    st.divider()
 
     # --- 重置函数 ---
     def reset_agent_config():

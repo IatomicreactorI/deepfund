@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd # Import pandas for example dataframes
 
 def display_reports():
+    st.divider()
     st.title("📊 Agent Performance Reports")
     st.markdown("Access detailed insights into your AI agent's operations, including:")
     st.markdown("""

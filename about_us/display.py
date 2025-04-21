@@ -1,6 +1,7 @@
 import streamlit as st
 
 def display_about_us():
+    st.divider()
     st.title("🔥 About DeepFund 💰")
 
     st.markdown("""
@@ -70,5 +71,3 @@ def display_about_us():
     st.subheader("Disclaimer")
     st.warning("This project is for educational and research purposes only. It **DOES NOT** execute real trades or provide financial advice.")
     
-    st.markdown("--- ")
-    st.caption("DeepFund is licensed under the MIT License.") 

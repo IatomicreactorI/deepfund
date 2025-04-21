@@ -5,12 +5,11 @@ from streamlit_option_menu import option_menu
 import json # Needed for parsing holdings
 import numpy as np
 
-# 修改导入语句，使用各子模块的函数
-# 注意：这里我们只导入已经完成重构的模块，对于leaderboard模块暂时保留本地实现
 from agent_lab import display_agent_lab  
 from about_us import display_about_us
 from market_pages import display_markets  # 从重构后的market_pages模块导入
 from reports import display_reports
+from community import display_community  # 导入新的community模块
 
 # leaderboard模块暂时不导入，因为我们还没有完成所有功能的迁移
 # 在完成迁移后，可以添加: from leaderboard import display_leaderboard
@@ -402,6 +401,7 @@ def get_banner_data(config_df, portfolio_df_orig):
 # --- Page Display Functions ---
 
 def display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig):
+    st.divider()
     st.title("🏆 Leaderboard for All LLM Models in Stock Market 📈")
 
     # --- Chart Section (Existing Logic) ---
@@ -1013,6 +1013,10 @@ def show_about_us():
     # 调用导入的函数
     display_about_us() 
 
+def show_community():
+    # 调用导入的函数
+    display_community()
+
 # --- Main App Logic --- 
 
 # Initialize data variables
@@ -1083,7 +1087,7 @@ st.title("💰DEEPFUND🔥--The First AI Live Investment Arena")
 links_md = """ 
 <span style="font-size: 1.3em;">
 
-[WeChat](#WeChat) | [Twitter](#twitter) | [小红书](#小红书) | [GitHub](https://github.com/HKUSTDial/deepfund) | [Paper](http://arxiv.org/abs/2503.18313) | [BiliBili](#BiliBili)
+[WeChat](#WeChat) | [Twitter](#twitter) | [小红书](https://www.xiaohongshu.com/user/profile/67f78832000000000e011700) | [GitHub](https://github.com/HKUSTDial/deepfund) | [Paper](http://arxiv.org/abs/2503.18313) | [BiliBili](#BiliBili)
 """
 st.markdown(links_md, unsafe_allow_html=True)
 
@@ -1117,8 +1121,8 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         
         selected_page = option_menu(
             menu_title=None, # Remove text title, logo is now the title
-            options=["Leaderboard", "Agent Lab", "About Us", "Markets", "Reports"],
-            icons=['graph-up', 'robot', 'info-circle', 'bank', 'file-earmark-text'],
+            options=["Leaderboard", "Markets", "Reports", "Agent Lab", "Community", "About Us"],
+            icons=['graph-up', 'coin', 'newspaper', 'robot', 'people', 'info-circle'],
             menu_icon="wallet2", 
             default_index=0,
             orientation="vertical", 
@@ -1142,6 +1146,8 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         show_markets() 
     elif selected_page == "Reports":
         show_reports() 
+    elif selected_page == "Community":
+        show_community()
     elif selected_page == "About Us":
         show_about_us()
 

@@ -14,6 +14,7 @@ def display_markets():
         st.session_state.selected_market_file = file
 
     # --- Title and Initial Description ---
+    st.divider()
     st.title("📈 Explore Market Sectors 🌐")
     st.markdown("Dive into specific market sectors for detailed analysis, data, and insights. Access to detailed sector pages is a premium feature.")
     
