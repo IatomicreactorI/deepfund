@@ -1001,10 +1001,6 @@ def show_agent_lab():
     # 调用导入的函数
     display_agent_lab()
 
-def show_about_us():
-    # 调用导入的函数
-    display_about_us() 
-
 def show_markets():
     # 调用导入的函数
     display_markets() 
@@ -1012,6 +1008,10 @@ def show_markets():
 def show_reports():
     # 调用导入的函数
     display_reports() 
+
+def show_about_us():
+    # 调用导入的函数
+    display_about_us() 
 
 # --- Main App Logic --- 
 
@@ -1138,12 +1138,12 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig)
     elif selected_page == "Agent Lab":
         show_agent_lab()
-    elif selected_page == "About Us":
-        show_about_us()
     elif selected_page == "Markets":
         show_markets() 
     elif selected_page == "Reports":
         show_reports() 
+    elif selected_page == "About Us":
+        show_about_us()
 
 else:
      st.warning("App cannot display main content because data failed to load correctly.")

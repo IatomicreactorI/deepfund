@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import json
+from .analysts_selector import display_analysts_selector
 
 def display_agent_lab():
     st.title("🧪 Agent Lab - Build & Deploy Your AI Analysts 🤖")
@@ -15,8 +16,8 @@ def display_agent_lab():
 
     st.divider()
 
-    # --- Initialize Session State for Agent Configuration ---
-    if 'agent_config' not in st.session_state:
+    # --- 重置函数 ---
+    def reset_agent_config():
         st.session_state.agent_config = {
             'market': None,
             'base_model': None,
@@ -24,10 +25,82 @@ def display_agent_lab():
             'selected_analysts': [],
             'risk_preference': 50  # Default to mid-level risk
         }
+        # 不重置表单提交标志，保留表单提交后的配置展示
+
+    # --- Initialize Session State for Agent Configuration ---
+    if 'agent_config' not in st.session_state:
+        reset_agent_config()
     
-    # --- Agent Creation Form ---
-    st.subheader("🤖 Create Your Custom Agent")
+    # 初始化弹窗控制变量
+    if 'show_analyst_selector' not in st.session_state:
+        st.session_state.show_analyst_selector = False
+        
+    # 初始化表单提交标志
+    if 'form_submitted' not in st.session_state:
+        st.session_state.form_submitted = False
     
+    # --- 如果弹窗标志为True，显示弹窗 ---
+    if st.session_state.show_analyst_selector:
+        display_analysts_selector()
+        return  # 弹窗显示时不显示主界面
+    
+    # --- Agent Creation Section ---
+    # 使用更灵活的布局方式放置标题和重置按钮
+    header_container = st.container()
+    
+    # 可以调整此比例来改变标题和按钮的相对宽度
+    # 例如 [0.9, 0.1] 会使按钮部分更宽
+    title_col, reset_col = header_container.columns([0.92, 0.08])
+    
+    with title_col:
+        st.subheader("🤖 Create Your Custom Agent")
+    
+    with reset_col:
+        # 可以通过CSS调整按钮在列中的位置
+        # 这里使用一个容器来放置按钮，便于控制其位置
+        button_container = st.container()
+        
+        # 通过添加垂直空间来调整按钮的垂直位置（如需要）
+        # st.write("")  # 添加一些垂直空间，可以取消注释调整
+        
+        # 使用一个简单的按钮，带有重置图标符号
+        if button_container.button("↻", help="Reset all settings to default values", key="reset_button"):
+            reset_agent_config()
+            st.session_state.form_submitted = False
+            st.rerun()
+    
+    # --- 表单外部的Planner选择 ---
+    use_planner = st.checkbox(
+        "Use Planner Agent (Orchestrates multiple analysts automatically)", 
+        value=st.session_state.agent_config['use_planner'],
+        key="planner_checkbox_outside_form"
+    )
+    
+    # --- 如果不使用Planner，显示Analyst选择部分 (表单外) ---
+    if not use_planner:
+        st.subheader("Select Analysts")
+        
+        # 显示已选择的分析师数量
+        selected_count = len(st.session_state.agent_config['selected_analysts'])
+        if selected_count > 0:
+            selected_analysts_names = ", ".join(st.session_state.agent_config['selected_analysts'][:3])
+            if selected_count > 3:
+                selected_analysts_names += f" and {selected_count - 3} more..."
+            st.success(f"Selected {selected_count} analysts: {selected_analysts_names}")
+        else:
+            st.warning("No analysts selected yet. Click the button below to select.")
+        
+        # 创建一个按钮来打开分析师选择弹窗 (表单外)
+        if st.button("📋 Open Analysts Selector"):
+            st.session_state.show_analyst_selector = True
+            st.rerun()
+    else:
+        st.info("The Planner agent will automatically select and coordinate appropriate analysts based on market conditions and your risk preference.")
+    
+    # 添加一个分隔符以增强视觉区分
+    st.divider()
+    
+    # --- 其余配置项放在表单内 ---
     with st.form("agent_creation_form"):
         # 1. Market Selection
         market_options = [
@@ -60,142 +133,6 @@ def display_agent_lab():
             index=0 if st.session_state.agent_config['base_model'] is None 
                   else model_options.index(st.session_state.agent_config['base_model'])
         )
-        
-        # 3. Planner Selection
-        use_planner = st.checkbox(
-            "Use Planner Agent (Orchestrates multiple analysts automatically)", 
-            value=st.session_state.agent_config['use_planner']
-        )
-        
-        # Show different options based on planner selection
-        if use_planner:
-            st.info("The Planner agent will automatically select and coordinate appropriate analysts based on market conditions and your risk preference.")
-        else:
-            # 4. Analyst Selection (only if not using planner)
-            st.subheader("Select Analysts")
-            
-            # Load analysts from CSV
-            analysts_df = load_analysts_csv()
-            
-            if not analysts_df.empty:
-                # Group analysts by category
-                analyst_categories = analysts_df.groupby('category')
-                
-                # Display analysts by category with different colors
-                selected_analysts = []
-                
-                # Category color map
-                category_colors = {
-                    "Fundamental Analysis": "rgba(200, 230, 201, 0.5)",  # Light Green
-                    "Technical Analysis": "rgba(179, 229, 252, 0.5)",    # Light Blue
-                    "Market Sentiment": "rgba(255, 224, 178, 0.5)",      # Light Orange
-                    "Risk Management": "rgba(225, 190, 231, 0.5)",       # Light Purple
-                    "Macroeconomic": "rgba(248, 187, 208, 0.5)"          # Light Pink
-                }
-                
-                # Process each category
-                for category, group in analyst_categories:
-                    # Get the appropriate color or use a default if category not in map
-                    bg_color = category_colors.get(category, "rgba(224, 224, 224, 0.5)")  # Default light gray
-                    
-                    # Container with styled background
-                    container_style = f"background-color: {bg_color}; border-radius: 5px; padding: 10px; margin-bottom: 10px;"
-                    
-                    st.markdown(f"""
-                    <div style="{container_style}">
-                    <h4>{category}</h4>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Create a row of columns for each group of 3 analysts
-                    analysts_in_category = group['name'].tolist()
-                    
-                    # Create three columns per row
-                    for i in range(0, len(analysts_in_category), 3):
-                        cols = st.columns(3)
-                        
-                        # Fill the columns with analysts (up to 3 per row)
-                        for j in range(3):
-                            if i + j < len(analysts_in_category):
-                                analyst = analysts_in_category[i + j]
-                                analyst_info = group[group['name'] == analyst].iloc[0]
-                                
-                                with cols[j]:
-                                    # Use checkbox for selection
-                                    is_selected = analyst in st.session_state.agent_config['selected_analysts']
-                                    if st.checkbox(analyst, value=is_selected, key=f"analyst_{category}_{analyst}"):
-                                        selected_analysts.append(analyst)
-                                    
-                                    # Show tooltip with description on hover
-                                    st.caption(f"ℹ️ {analyst_info['description']}")
-            else:
-                # Fallback to demo analysts if CSV is empty or can't be loaded
-                st.warning("Could not load analysts from CSV. Using demo analysts instead.")
-                
-                # Demo analyst categories (same as before)
-                analyst_categories = {
-                    "Fundamental Analysis": [
-                        "Financial Statement Analyst", 
-                        "Valuation Expert", 
-                        "Industry Specialist"
-                    ],
-                    "Technical Analysis": [
-                        "Chart Pattern Analyst", 
-                        "Momentum Tracker", 
-                        "Volatility Expert"
-                    ],
-                    "Market Sentiment": [
-                        "News Sentiment Analyst", 
-                        "Social Media Monitor", 
-                        "Earnings Call Specialist"
-                    ],
-                    "Risk Management": [
-                        "Portfolio Risk Analyst", 
-                        "Hedging Strategist", 
-                        "Drawdown Protector"
-                    ]
-                }
-                
-                # Display demo analysts by category
-                selected_analysts = []
-                
-                for category, analysts in analyst_categories.items():
-                    # Use different background colors for different categories
-                    if category == "Fundamental Analysis":
-                        container_style = "background-color: rgba(200, 230, 201, 0.5); border-radius: 5px; padding: 10px;"
-                    elif category == "Technical Analysis":
-                        container_style = "background-color: rgba(179, 229, 252, 0.5); border-radius: 5px; padding: 10px;"
-                    elif category == "Market Sentiment":
-                        container_style = "background-color: rgba(255, 224, 178, 0.5); border-radius: 5px; padding: 10px;"
-                    else:  # Risk Management
-                        container_style = "background-color: rgba(225, 190, 231, 0.5); border-radius: 5px; padding: 10px;"
-                    
-                    with st.container():
-                        st.markdown(f"""
-                        <div style="{container_style}">
-                        <h4>{category}</h4>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Create checkboxes for analysts in this category
-                        category_selections = []
-                        cols = st.columns(3)
-                        for i, analyst in enumerate(analysts):
-                            with cols[i % 3]:
-                                is_selected = analyst in st.session_state.agent_config['selected_analysts']
-                                if st.checkbox(analyst, value=is_selected, key=f"analyst_{category}_{analyst}"):
-                                    category_selections.append(analyst)
-                                
-                                # Add a generic description for demo analysts
-                                st.caption(f"ℹ️ Demo {analyst}")
-                        
-                        selected_analysts.extend(category_selections)
-            
-            # Display a counter of selected analysts
-            if selected_analysts:
-                st.info(f"You have selected {len(selected_analysts)} analysts.")
-            else:
-                st.warning("Please select at least one analyst or enable the Planner.")
         
         # 5. Risk Preference Slider
         risk_preference = st.slider(
@@ -231,46 +168,68 @@ def display_agent_lab():
         
         if submitted:
             # Validation
-            if not use_planner and not selected_analysts:
+            if not use_planner and not st.session_state.agent_config['selected_analysts']:
                 st.error("Please select at least one analyst or enable the Planner.")
                 return
                 
-            # Save the configuration
-            st.session_state.agent_config = {
+            # 保存当前配置（用于显示配置摘要）
+            temp_config = {
                 'market': selected_market,
                 'base_model': selected_model,
                 'use_planner': use_planner,
-                'selected_analysts': selected_analysts if not use_planner else [],
-                'risk_preference': risk_preference
+                'risk_preference': risk_preference,
+                'selected_analysts': st.session_state.agent_config['selected_analysts']
             }
             
-            st.success(f"Agent configured successfully! Your agent will trade in the {selected_market} market.")
+            # 如果使用planner，清空已选分析师
+            if use_planner:
+                temp_config['selected_analysts'] = []
             
-            # Display configuration summary
-            st.subheader("Agent Configuration")
+            # 设置表单已提交标志和保存描述
+            st.session_state.form_submitted = True
+            st.session_state.last_risk_description = risk_description
+            st.session_state.last_config = temp_config  # 保存配置以供显示
             
-            # Format the JSON for display
-            config_display = {
-                "Market": selected_market,
-                "Base Model": selected_model,
-                "Using Planner": "Yes" if use_planner else "No",
-                "Risk Profile": f"{risk_preference}% ({risk_description.split(':')[0]})"
-            }
+            # 重置配置为默认值
+            reset_agent_config()
+    
+    # --- 表单提交后的显示内容（在表单外部）---
+    if st.session_state.form_submitted and hasattr(st.session_state, 'last_config'):
+        st.success(f"Agent configured successfully! Your agent will trade in the {st.session_state.last_config['market']} market.")
+        
+        # Display configuration summary
+        st.subheader("Agent Configuration")
+        
+        # 获取保存的数据
+        last_config = st.session_state.last_config
+        selected_market = last_config['market']
+        selected_model = last_config['base_model']
+        use_planner = last_config['use_planner']
+        risk_preference = last_config['risk_preference']
+        risk_description = st.session_state.last_risk_description
+        
+        # Format the JSON for display
+        config_display = {
+            "Market": selected_market,
+            "Base Model": selected_model,
+            "Using Planner": "Yes" if use_planner else "No",
+            "Risk Profile": f"{risk_preference}% ({risk_description.split(':')[0]})"
+        }
+        
+        if not use_planner:
+            config_display["Selected Analysts"] = last_config['selected_analysts']
             
-            if not use_planner:
-                config_display["Selected Analysts"] = selected_analysts
-                
-            # Show formatted configuration
-            st.json(config_display)
-            
-            # Option to download configuration
-            config_json = json.dumps(st.session_state.agent_config, indent=2)
-            st.download_button(
-                label="Export Agent Config (JSON)",
-                data=config_json,
-                file_name=f"{selected_market.replace(' ', '_').lower()}_agent_config.json",
-                mime='application/json',
-            )
+        # Show formatted configuration
+        st.json(config_display)
+        
+        # Option to download configuration (表单外部)
+        config_json = json.dumps(last_config, indent=2)
+        st.download_button(
+            label="Export Agent Config (JSON)",
+            data=config_json,
+            file_name=f"{selected_market.replace(' ', '_').lower()}_agent_config.json",
+            mime='application/json',
+        )
     
     st.divider()
     
@@ -288,7 +247,7 @@ def display_agent_lab():
                 if st.button("Load Imported Configuration"):
                     st.session_state.agent_config = imported_config
                     st.success("Configuration loaded successfully!")
-                    st.experimental_rerun()
+                    st.rerun()
             except Exception as e:
                 st.error(f"Error loading configuration: {e}")
     
@@ -307,18 +266,4 @@ def display_agent_lab():
     st.divider()
     
     # --- Information Section ---
-    st.markdown("**Note:** The Agent Lab is currently in beta. More features like backtesting, live paper trading, and detailed performance analytics are under development.")
-
-
-def load_analysts_csv():
-    """Load analysts from CSV file or return empty DataFrame if file doesn't exist or is empty."""
-    try:
-        # Check if the file exists and has content
-        if os.path.exists('data/analysts.csv') and os.path.getsize('data/analysts.csv') > 0:
-            analysts_df = pd.read_csv('data/analysts.csv')
-            return analysts_df
-        else:
-            return pd.DataFrame()
-    except Exception as e:
-        st.warning(f"Error loading analysts.csv: {e}")
-        return pd.DataFrame() 
+    st.markdown("**Note:** The Agent Lab is currently in beta. More features like backtesting, live paper trading, and detailed performance analytics are under development.") 
