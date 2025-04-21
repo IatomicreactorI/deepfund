@@ -14,7 +14,11 @@ from community import display_community  # 导入新的community模块
 # leaderboard模块暂时不导入，因为我们还没有完成所有功能的迁移
 # 在完成迁移后，可以添加: from leaderboard import display_leaderboard
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="DeepFund",
+    page_icon="image/logopure.svg",
+    layout="wide"
+)
 
 # --- Marquee CSS (Updated for Fixed Positioning and Padding) ---
 marquee_css = """
@@ -1121,8 +1125,8 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         
         selected_page = option_menu(
             menu_title=None, # Remove text title, logo is now the title
-            options=["Leaderboard", "Markets", "Reports", "Agent Lab", "Community", "About Us"],
-            icons=['graph-up', 'coin', 'newspaper', 'robot', 'people', 'info-circle'],
+            options=["Leaderboard", "Agent Lab", "Community", "Markets", "Reports", "About Us"],
+            icons=['graph-up','robot', 'people', 'coin', 'newspaper',  'info-circle'],
             menu_icon="wallet2", 
             default_index=0,
             orientation="vertical", 
