@@ -197,9 +197,15 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
     if portfolio_df_orig is None or portfolio_df_orig.empty or config_df is None or config_df.empty:
         return pd.DataFrame()
 
-    # Ensure timestamp is datetime and sort globally first
+    # 确保时间戳是datetime类型并全局排序
     if not pd.api.types.is_datetime64_any_dtype(portfolio_df_orig['timestamp']):
         portfolio_df_orig['timestamp'] = pd.to_datetime(portfolio_df_orig['timestamp'], errors='coerce')
+    
+    # 如果有trading_date字段，也进行处理
+    if 'trading_date' in portfolio_df_orig.columns:
+        if not pd.api.types.is_datetime64_any_dtype(portfolio_df_orig['trading_date']):
+            portfolio_df_orig['trading_date'] = pd.to_datetime(portfolio_df_orig['trading_date'], errors='coerce')
+    
     portfolio_df_orig = portfolio_df_orig.dropna(subset=['timestamp']).sort_values('timestamp')
 
     grouped = portfolio_df_orig.groupby('config_id')
@@ -219,7 +225,15 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
         latest_date = latest_row['timestamp']
         latest_total_value = latest_row['total_value']
         latest_holdings_str = latest_row['holdings']
-        start_date = group_sorted['timestamp'].min().strftime('%Y-%m-%d')
+        
+        # 使用trading_date作为开始日期（如果可用），否则使用timestamp
+        if 'trading_date' in latest_row and pd.notna(latest_row['trading_date']):
+            start_date = group_sorted['trading_date'].min().strftime('%Y-%m-%d')
+            end_date = latest_row['trading_date'].strftime('%Y-%m-%d')
+        else:
+            start_date = group_sorted['timestamp'].min().strftime('%Y-%m-%d')
+            end_date = latest_date.strftime('%Y-%m-%d')
+            
         daily_return_pct = calculate_last_daily_return(group_sorted['total_value'])
         total_cumulative_return_series = calculate_cumulative_return(group_sorted['total_value'])
         total_return_pct_latest = total_cumulative_return_series.iloc[-1] if not total_cumulative_return_series.empty else None
@@ -233,10 +247,10 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
             'config_id': config_id,
             'LLM Model': llm_model,
             'Start Date': start_date,
-            'End Date': latest_date, # Add End Date (will format later)
+            'End Date': end_date, # 使用实际的结束日期
             'Decision Accuracy (%)': 'N/A', # Placeholder
             'Daily Return (%)': daily_return_pct,
-            'Analyst Portfolio': 'N/A', # Placeholder
+            'Analyst Portfolio': format_holdings(latest_holdings_str, latest_total_value), # 显示当前持仓
             'Total Return (%)': total_return_pct_latest,
             'Current Total Value ($)': latest_total_value,
         })
@@ -297,10 +311,6 @@ def calculate_experiment_stats(config_df, portfolio_df_orig):
         # No previous data available for any experiment
         final_stats_df = latest_stats_df
         final_stats_df['Rank Change'] = 'New'
-
-
-    # Format End Date
-    final_stats_df['End Date'] = final_stats_df['End Date'].dt.strftime('%Y-%m-%d')
 
     # --- Defer numeric formatting to display function ---
 
@@ -1031,36 +1041,56 @@ data_loaded_successfully = False
 
 # Load data first
 try:
-    config_df = pd.read_csv('data/config_rows.csv')
+    # 更新为新的数据文件路径
+    config_df = pd.read_csv('data/config_rows_new.csv')
     if 'id' not in config_df.columns or 'exp_name' not in config_df.columns:
          raise ValueError("Config file must contain 'id' and 'exp_name' columns.")
 
-    portfolio_cols = ['portfolio_id', 'config_id', 'timestamp', 'cash', 'total_value', 'holdings']
-    portfolio_df_orig = pd.read_csv('data/portfolio_rows.csv', names=portfolio_cols, header=None, skiprows=1)
+    # 更新为新的数据文件路径，并使用新的字段结构
+    portfolio_df_orig = pd.read_csv('data/portfolio_rows_new.csv')
 
     if not portfolio_df_orig.empty:
-        if not all(col in portfolio_df_orig.columns for col in ['config_id', 'timestamp', 'total_value', 'holdings']): # Added holdings check
-             raise ValueError("Portfolio file must contain 'config_id', 'timestamp', 'total_value', 'holdings' columns.")
+        # 检查新数据结构的必需字段
+        required_cols = ['config_id', 'updated_at', 'trading_date', 'total_assets', 'positions']
+        if not all(col in portfolio_df_orig.columns for col in required_cols):
+             raise ValueError(f"Portfolio file must contain {required_cols} columns.")
+        
+        # 重命名字段以保持与现有代码的兼容性
+        portfolio_df_orig = portfolio_df_orig.rename(columns={
+            'updated_at': 'timestamp',
+            'total_assets': 'total_value', 
+            'positions': 'holdings'
+        })
+        
+        # 添加trading_date到timestamp的处理
+        portfolio_df_orig['trading_date'] = pd.to_datetime(portfolio_df_orig['trading_date'], errors='coerce')
         portfolio_df_orig['timestamp'] = pd.to_datetime(portfolio_df_orig['timestamp'], errors='coerce')
-        portfolio_df_orig.dropna(subset=['timestamp', 'config_id', 'total_value'], inplace=True) # Keep rows even if holdings are NaN initially
+        
+        # 清理数据
+        portfolio_df_orig.dropna(subset=['timestamp', 'config_id', 'total_value'], inplace=True)
+        
+        # 处理重复的timestamp - 按config_id分组，保留每个时间戳的最新记录
+        portfolio_df_orig = portfolio_df_orig.sort_values(['config_id', 'timestamp'])
+        portfolio_df_orig = portfolio_df_orig.drop_duplicates(subset=['config_id', 'timestamp'], keep='last')
+        
+        # 创建索引版本
         portfolio_df_indexed = portfolio_df_orig.set_index('timestamp').copy()
     else:
-        # Define columns for empty DataFrames to avoid errors later
-        portfolio_df_indexed = pd.DataFrame(columns=portfolio_cols[1:])
+        # 为空DataFrame定义列
+        portfolio_df_indexed = pd.DataFrame(columns=['config_id', 'total_value', 'holdings', 'cashflow', 'trading_date'])
         portfolio_df_indexed['timestamp'] = pd.to_datetime([])
         portfolio_df_indexed = portfolio_df_indexed.set_index('timestamp')
-        portfolio_df_orig = pd.DataFrame(columns=portfolio_cols)
-
+        portfolio_df_orig = pd.DataFrame(columns=['config_id', 'timestamp', 'total_value', 'holdings', 'cashflow', 'trading_date'])
 
     data_loaded_successfully = True
 
 except FileNotFoundError as e:
-    st.error(f"Error loading data file: {e}. Please ensure 'data/config_rows.csv' and 'data/portfolio_rows.csv' exist.")
+    st.error(f"Error loading data file: {e}. Please ensure 'data/config_rows_new.csv' and 'data/portfolio_rows_new.csv' exist.")
 except pd.errors.EmptyDataError as e:
     st.warning(f"Data file is empty: {e}. Some features might be unavailable.")
     if config_df is not None and portfolio_df_orig is None:
-         portfolio_df_orig = pd.DataFrame(columns=portfolio_cols)
-         portfolio_df_indexed = portfolio_df_orig.set_index('timestamp') # Set index on empty df
+         portfolio_df_orig = pd.DataFrame(columns=['config_id', 'timestamp', 'total_value', 'holdings', 'cashflow', 'trading_date'])
+         portfolio_df_indexed = portfolio_df_orig.set_index('timestamp')
          data_loaded_successfully = True
     elif config_df is None:
          data_loaded_successfully = False
@@ -1126,7 +1156,7 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
         selected_page = option_menu(
             menu_title=None, # Remove text title, logo is now the title
             options=["Leaderboard", "Agent Lab", "Community", "Markets", "Reports", "About Us"],
-            icons=['graph-up','robot', 'people', 'coin', 'newspaper',  'info-circle'],
+            icons=['graph-up', 'robot', 'people', 'coin', 'newspaper',  'info-circle'],
             menu_icon="wallet2", 
             default_index=0,
             orientation="vertical", 
@@ -1142,8 +1172,15 @@ if data_loaded_successfully and config_df is not None and portfolio_df_indexed i
     # --- Page Display Logic (remains outside sidebar) ---
     # Display the selected page content
     if selected_page == "Leaderboard":
-        # Pass portfolio_df_orig to the function as well
-        display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig)
+        # 使用增强版排行榜作为主要排行榜
+        try:
+            from leaderboard_enhanced import display_enhanced_leaderboard
+            display_enhanced_leaderboard()
+        except ImportError as e:
+            st.error(f"排行榜模块加载失败: {e}")
+            st.info("请确保已安装必要的依赖包：pip install plotly")
+            # 如果增强版失败，回退到原版本
+            display_leaderboard(config_df, portfolio_df_indexed, portfolio_df_orig)
     elif selected_page == "Agent Lab":
         show_agent_lab()
     elif selected_page == "Markets":

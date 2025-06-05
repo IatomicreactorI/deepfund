@@ -1,0 +1,10 @@
+id,exp_name,updated_at,tickers,has_planner,llm_model,llm_provider
+92324c1c-498e-438a-939a-58e240ac1398,Qwen-Max,2025-04-21 06:44:12.536421+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,qwen-max-2025-01-25,Alibaba
+89bbf7f6-aecb-4045-8e13-ad876f5bc4ea,Doubao1.5-pro,2025-04-21 05:55:34.005875+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,Doubao-1.5-pro-32k,AiHubMix
+74ecabb0-48d9-44b8-b929-1f513bd03fc1,Meta-Llama-4-scout,2025-04-21 02:34:34.732079+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,meta-llama/llama-4-scout-17b-16e-instruct,AiHubMix
+53e65789-4850-45fb-926a-875a9b2d6782,Grok-3-Mini-Beta,2025-04-17 09:19:58.913449+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,grok-3-mini-beta,AiHubMix
+bc72086a-0e32-452a-8eae-a520fd94a5b1,GPT-4.1,2025-04-29 13:45:53.523424+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,gpt-4.1,AiHubMix
+f490d069-a144-4eaf-9bea-8cb3e567a036,GLM-4-Air,2025-04-21 05:37:23.615692+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,glm-4-air-250414,ZhiPu
+b534f764-819b-4540-bb30-4b3e2d47c0a3,Gemini-2.5-Flash,2025-04-23 02:21:15.777375+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,gemini-2.5-flash-preview-04-17-nothink,AiHubMix
+a4584645-71eb-4031-bd9a-01cb6ca357aa,DeepSeek-V3,2025-04-17 09:18:48.015071+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,deepseek-chat,DeepSeek
+920701f3-3447-49d8-9b77-f1f713fd609c,Claude-3.7-Sonnet,2025-04-17 09:15:03.382232+00,"[""AAPL"", ""AXP"", ""BAC"", ""KO"", ""CVX""]",false,claude-3-7-sonnet-20250219,AiHubMix
